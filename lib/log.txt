@@ -1,0 +1,9 @@
+build.gradle in android/app
+    changed 
+    compileSdk, targetSdk, minSdk
+
+pubspec.yaml
+    added
+    dependency_overrides:
+        geolocator_android:
+            path: patched_plugins/geolocator_android

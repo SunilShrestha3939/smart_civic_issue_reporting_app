@@ -1,0 +1,6 @@
+geolocator error
+    steps:
+        - added 'patched_plugins\geolocator_android' locally
+        - copy paste all files and folder from c drive where geolocator plugins are located to above mentioned path 
+        - add dependency override in pubspec.yaml
+        - change compileSdk, minSdk, targetSdk in build.gradle file of android/app

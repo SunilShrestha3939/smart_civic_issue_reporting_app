@@ -1,0 +1,43 @@
+main() and runApp(): These are the very first things that execute when your Flutter app starts. runApp() inflates your root widget (MyApp in our case) and attaches it to the screen.
+
+MaterialApp: This widget provides the fundamental Material Design capabilities to your app. It sets up the navigation stack, theme data, and other essential services. Without it, you wouldn't have many of the features expected in a standard mobile app.
+
+StatelessWidget vs. StatefulWidget: We use StatelessWidget for MyApp because its content (title, theme, initial route) doesn't change during the app's lifetime. We use StatefulWidget for SplashScreen because it needs to perform an action (the delayed navigation) after the widget has been created and initialized (initState). This action changes the "state" of the app by moving to a new screen.
+
+Navigator and pushReplacement: The Navigator manages a stack of routes (screens). pushReplacement is crucial for a splash screen because you usually don't want users to be able to go back to it. It replaces the current route with a new one, effectively removing the splash screen from the navigation history.
+
+Future.delayed: This function allows us to execute a piece of code after a specified duration. It's commonly used for splash screens, simulating network calls, or other time-sensitive operations
+
+StatefulWidget for Forms: Forms are inherently stateful because the values in the text fields change as the user types. The TextEditingController and the _formKey manage and provide access to this changing state.
+
+GlobalKey<FormState>: This key allows you to interact with the Form widget from its State. Calling _formKey.currentState!.validate() on it is the standard way to trigger validation for all TextFormField children.
+
+TextEditingController: This is the bridge between your UI TextFormField and your Dart code. It lets you programmatically set and get the text content of the input field.
+
+validator in TextFormField: This property is a powerful way to define validation rules for each input field. Flutter automatically handles displaying the error message (the string returned by the validator) below the text field when validation fails.
+
+SingleChildScrollView: This widget is a lifesaver for forms! Without it, if your form content exceeds the screen height (especially when the keyboard is open), you'll get a "bottom overflowed by X pixels" error. SingleChildScrollView wraps your content and allows it to scroll, preventing this issue and ensuring all input fields are accessible.
+
+Navigator.push vs. Navigator.pop:
+
+push: Adds a new screen to the top of the navigation stack. The previous screen is still there, just underneath. This is suitable for going from Login to Register, as the user might want to go back.
+
+pop: Removes the topmost screen from the navigation stack, revealing the screen underneath. This is used when a task is completed (like registration) and you want to return to the previous context.
+
+BottomNavigationBar for Main Navigation: It's a standard UI pattern for apps with distinct sections, providing clear and persistent navigation between them without feeling lost.
+
+FloatingActionButton for Primary Actions: It's visually prominent and guides the user to the most important action on a given screen, which in our case is reporting a new issue from the issue list view.
+
+ListView.builder for Performance: For lists with many items, ListView.builder is much more efficient than a simple Column or ListView because it only creates the widgets for items that are currently visible on the screen, recycling them as you scroll. This saves memory and CPU.
+
+DropdownButtonFormField for Controlled Input: It's ideal when you want users to select from a predefined list of options, ensuring data consistency. Its integration with Form allows for validation.
+
+SingleChildScrollView for Form Usability: As mentioned before, this is crucial for forms to prevent overflow errors when the keyboard appears and to allow users to scroll through all input fields.
+
+Data Models (e.g., Issue class): Using dedicated data model classes is crucial for organizing your application's data. It provides strong typing, makes your code more readable, and simplifies data handling, especially when interacting with APIs (like your Django backend). Instead of passing around raw Map<String, dynamic>, you pass well-defined Issue objects.
+
+Passing Data via Constructor: The most straightforward way to pass data to a new screen in Flutter is through its constructor. When you create an instance of IssueDetailScreen, you provide the Issue object it needs to display.
+
+Navigator.push for Forward Navigation: When you want to go to a new screen and allow the user to go back to the previous one (like viewing details then returning to the list), Navigator.push is the correct method. It adds the new route to the top of the navigation stack.
+
+MaterialPageRoute: This is a convenience class that creates a route that animates and behaves like a Material Design page transition. Its builder function provides the context and returns the widget for the new screen.
