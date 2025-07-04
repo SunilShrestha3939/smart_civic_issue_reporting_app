@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:smart_civic_app/screens/report_issue_screen.dart'; // We'll create this next
-import 'package:smart_civic_app/screens/view_issues_screen.dart'; // We'll create this next
+import 'package:provider/provider.dart'; // Import provider
+import 'package:smart_civic_app/screens/report_issue_screen.dart';
+import 'package:smart_civic_app/screens/view_issues_screen.dart';
+import 'package:smart_civic_app/providers/app_provider.dart'; 
+import 'package:smart_civic_app/screens/login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,7 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
   static const List<Widget> _widgetOptions = <Widget>[
     ViewIssuesScreen(), // Placeholder for viewing issues
     ReportIssueScreen(), // Screen for reporting a new issue
-    Text('Profile Screen Placeholder', style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold)), // Example Profile screen
+    _ProfileSettingsScreen(), 
   ];
 
   //_onItemTapped: This callback function is triggered when a BottomNavigationBarItem is tapped. It updates _selectedIndex and calls setState to rebuild the body with the new selected widget.
@@ -27,8 +30,23 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _logout() async {
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    await appProvider.clearAuthToken(); // Clear token
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Logged out successfully!')),
+    );
+    // Navigator.of(context).pushAndRemoveUntil(..., (route) => false). This pushes the new route (LoginScreen) and removes all previous routes from the stack. This prevents the user from pressing the back button and accidentally returning to a logged-in HomeScreen.
+    Navigator.of(context).pushAndRemoveUntil( // Navigate to login and clear all previous routes
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      (Route<dynamic> route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final appProvider = Provider.of<AppProvider>(context, listen: false); // Not listen: true by default here, as we only call methods
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Smart Civic App'),
@@ -36,12 +54,12 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
+            onPressed: _logout,
+          ),
+          IconButton(
+            icon: Icon(appProvider.themeMode == ThemeMode.light ? Icons.dark_mode : Icons.light_mode),
             onPressed: () {
-              // TODO: Implement actual logout logic (clear token, navigate to login)
-              Navigator.of(context).pushReplacementNamed('/'); // Go back to splash or login
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Logged out! (Actual logout not implemented yet)')),
-              );
+              appProvider.toggleTheme(); // Call method on provider
             },
           ),
         ],
@@ -60,8 +78,8 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Report',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
+            icon: Icon(Icons.settings), 
+            label: 'Settings', 
           ),
         ],
         currentIndex: _selectedIndex, // Tells the navigation bar which item is currently active.
@@ -79,6 +97,50 @@ class _HomeScreenState extends State<HomeScreen> {
               child: const Icon(Icons.add, color: Colors.white),
             )
           : null, // Don't show FAB on other tabs
+    );
+  }
+}
+
+// New widget to demonstrate counter and theme toggle
+class _ProfileSettingsScreen extends StatelessWidget {
+  const _ProfileSettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // Using Consumer to rebuild only this part when AppProvider changes
+    return Consumer<AppProvider>(
+      builder: (context, appProvider, child) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Counter Value: ${appProvider.counter}', // Access counter from provider
+                style: const TextStyle(fontSize: 24),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  appProvider.incrementCounter(); // Call method on provider
+                },
+                child: const Text('Increment Counter'),
+              ),
+              const SizedBox(height: 40),
+              Text(
+                'Current Theme: ${appProvider.themeMode == ThemeMode.light ? 'Light' : 'Dark'}',
+                style: const TextStyle(fontSize: 20),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  appProvider.toggleTheme(); // Call method on provider
+                },
+                child: const Text('Toggle Theme'),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

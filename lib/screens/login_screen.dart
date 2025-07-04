@@ -1,6 +1,11 @@
+import 'dart:convert'; // For JSON encoding/decoding
 import 'package:flutter/material.dart';
-import 'package:smart_civic_app/screens/registration_screen.dart'; // We'll create this next
-import 'package:smart_civic_app/screens/home_screen.dart'; // We'll create this next
+import 'package:provider/provider.dart'; // Import provider
+import 'package:http/http.dart' as http; // Import http package
+import 'package:smart_civic_app/screens/home_screen.dart';
+import 'package:smart_civic_app/screens/registration_screen.dart';
+import 'package:smart_civic_app/providers/app_provider.dart'; // Import AppProvider
+import 'package:smart_civic_app/utils/constants.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,6 +21,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
+  bool _isLoading = false; // To manage loading state
+
   @override
   //to prevent memory leaks, dispose() of [TextEditingControllers] when the [StatefulWidget] is removed from the widget tree 
   void dispose() {
@@ -24,23 +31,59 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _login() {
+  void _login() async { // Make the function async because of Http requests
     // [_formKey.currentState!.validate()]: This is the magic line that triggers the validator function for every [TextFormField] inside this Form. If all validators return [null], the form is valid, and this method returns [true]. Otherwise, it returns false, and the error messages are displayed.
     if (_formKey.currentState!.validate()) {
- 
-      print('Logging in with:');
-      print('Email: ${_emailController.text}');
-      print('Password: ${_passwordController.text}');
-
-      // Simulate a successful login (replace with actual API call later)
-      Future.delayed(const Duration(seconds: 1), () { // Simulate network delay
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()), // Navigate to our new HomeScreen
-        );
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Login successful!')),
-        );
+      setState(() {
+        _isLoading = true; // Show loading
       });
+
+      // listen: false is used here because _login itself doesn't need to rebuild when AppProvider's state changes; it just needs to call methods on it.
+      final appProvider = Provider.of<AppProvider>(context, listen: false);
+      final url = Uri.parse('${AppConstants.baseUrl}/user/login/'); // Your Django login endpoint
+
+      try {
+        final response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'email': _emailController.text,
+            'password': _passwordController.text,
+          }),
+        );
+
+        if (response.statusCode == 200) {
+          final responseData = json.decode(response.body);
+          final token = responseData['access']; // must match with your Django backend's response structure
+          // You might also get user data here: final user = responseData['user'];
+
+          await appProvider.saveAuthToken(token); // Stores the token in SharedPreferences and updates AppProvider's state.
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Login successful!')),
+          );
+
+          // Navigate to Home Screen and replace the current route
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          );
+        } else {
+          final errorData = json.decode(response.body);
+          final errorMessage = errorData['detail'] ?? 'Login failed. Please check your credentials.'; // Adjust based on Django error key
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errorMessage)),
+          );
+        }
+      } catch (e) {
+        // Handle network errors or unexpected responses
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('An error occurred: $e')),
+        );
+      } finally {
+        setState(() {
+          _isLoading = false; // Hide loading
+        });
+      }
     }
   }
 

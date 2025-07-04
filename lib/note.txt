@@ -41,3 +41,41 @@ Passing Data via Constructor: The most straightforward way to pass data to a new
 Navigator.push for Forward Navigation: When you want to go to a new screen and allow the user to go back to the previous one (like viewing details then returning to the list), Navigator.push is the correct method. It adds the new route to the top of the navigation stack.
 
 MaterialPageRoute: This is a convenience class that creates a route that animates and behaves like a Material Design page transition. Its builder function provides the context and returns the widget for the new screen.
+
+
+
+PROVIDER
+
+ChangeNotifierProvider: This widget is placed high in the widget tree (usually above MaterialApp). It creates an instance of your ChangeNotifier (AppProvider in our case) and makes it available to all descendant widgets. It's like setting up a central store.
+
+ChangeNotifier: Your custom class (AppProvider) holds the actual data (state) and the logic to modify it. The notifyListeners() method is the key here; it broadcasts a signal that the state has changed.
+
+Provider.of<T>(context) (with listen: true or listen: false):
+
+When listen: true (the default), this tells Flutter: "Hey, I need access to T (e.g., AppProvider), and if T ever calls notifyListeners(), please rebuild this specific widget." This is good for widgets that display state.
+
+When listen: false, it tells Flutter: "I need access to T, but I don't care if it changes; I just want to call its methods." This is useful for buttons or other widgets that trigger state changes but don't need to rebuild themselves when the state changes.
+
+Consumer<T>: This is a more granular way to listen to state changes. Instead of rebuilding the entire build method of a StatelessWidget or StatefulWidget, Consumer only rebuilds its builder function when the listened-to provider changes. This helps optimize performance by limiting unnecessary rebuilds.
+
+
+
+http Package: This is Flutter's standard package for making network requests. It's lightweight and provides basic HTTP client functionalities.
+
+json.encode and json.decode: Dart's built-in dart:convert library allows you to convert Dart objects (like Maps) to JSON strings (json.encode) and JSON strings to Dart objects (json.decode). This is essential for talking to REST APIs.
+
+shared_preferences: This package provides a simple, persistent key-value store for small amounts of data. It's suitable for storing the authentication token locally. It's not for sensitive data (like passwords) but fine for tokens that can be refreshed.
+
+AppProvider as Auth Manager: By integrating authentication state (_authToken, _isLoggedIn) into AppProvider, we centralize this critical information. Any widget can access it via Provider.of or Consumer, and changes (like login/logout) automatically notify all listening parts of the UI.
+
+_checkAuthStatusAndNavigate in SplashScreen: This is a common pattern for initial app load. It delays navigation until the authentication status is determined, providing a seamless user experience. If a token exists, the user skips the login screen; otherwise, they are directed there.
+
+pushAndRemoveUntil for Logout: When logging out, we use Navigator.of(context).pushAndRemoveUntil(..., (route) => false). This pushes the new route (LoginScreen) and removes all previous routes from the stack. This prevents the user from pressing the back button and accidentally returning to a logged-in HomeScreen.
+
+
+
+multipart/form-data for Files: Standard HTML forms use this encoding when uploading files. The http package's MultipartRequest mimics this behavior, allowing you to send a mix of text data and binary file data in a single HTTP request. This is crucial for forms that include file uploads (like images).
+
+Authorization Header: For any API endpoint that requires a logged-in user, you must send the authentication token (received during login/registration) in the Authorization header. The format (e.g., Token YOUR_TOKEN or Bearer YOUR_TOKEN) depends on your Django REST Framework authentication setup. Your Django backend then validates this token to ensure the request is coming from an authenticated user.
+
+Separation of Concerns: By handling the API calls within the screen's _submitIssue method, we keep the UI logic and network logic somewhat separate. In larger apps, you might move this network logic into a dedicated "service" or "repository" class for even better organization.
