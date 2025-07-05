@@ -56,8 +56,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         );
 
         if (response.statusCode == 201) { // 201 Created for successful registration
-          final responseData = json.decode(response.body);
-          final token = responseData['token']; // Adjust 'token' key based on your Django API
+          // final responseData = json.decode(response.body);
+          // final token = responseData['token'];
+
+          // await appProvider.saveAuthToken(token); // Now calls fetchUserDetails internally
+
 
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Registration successful!')),

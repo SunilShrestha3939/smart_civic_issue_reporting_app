@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http; // Import http
 import 'dart:convert'; // For JSON decoding
-import 'package:smart_civic_app/models/issue.dart'; // Import Issue model
 import 'package:smart_civic_app/utils/constants.dart'; // Import AppConstants
+import 'package:smart_civic_app/models/user.dart'; // Import User model
+import 'package:smart_civic_app/models/issue.dart'; // Import Issue model
 
 class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provides the notifyListeners method
 
@@ -16,15 +17,21 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
   String? _authToken; 
   bool _isLoggedIn = false; 
 
-  List<Issue> _issues = []; // New: List to store fetched issues
-  bool _isIssuesLoading = false; // New: Loading state for issues
-  String? _issuesErrorMessage; // New: Error message for issues fetching
+  User? _currentUser; // Current user object
+  bool _isAdmin = false; // track if the user is an admin
+
+  List<Issue> _issues = []; // List to store fetched issues
+  bool _isIssuesLoading = false; // Loading state for issues
+  String? _issuesErrorMessage; // Error message for issues fetching
 
   // getters 
   int get counter => _counter;
   ThemeMode get themeMode => _themeMode;
   String? get authToken => _authToken;
   bool get isLoggedIn => _isLoggedIn;
+
+  User? get currentUser => _currentUser;
+  bool get isAdmin => _isAdmin;
 
   List<Issue> get issues => _issues; // Getter for issues
   bool get isIssuesLoading => _isIssuesLoading; // Getter for loading state
@@ -40,7 +47,11 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
     final prefs = await SharedPreferences.getInstance();
     _authToken = prefs.getString('auth_token');
     _isLoggedIn = _authToken != null;
-    notifyListeners(); // Notify listeners that login status might have changed
+
+    if (_isLoggedIn) {
+      await fetchUserDetails(); // Fetch user details if already logged in
+    }
+    notifyListeners(); // Notify listeners of initial state
   }
 
   // Method to save the token
@@ -49,6 +60,8 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
     await prefs.setString('auth_token', token);
     _authToken = token;
     _isLoggedIn = true;
+
+    await fetchUserDetails(); // Fetch user details after saving token
     notifyListeners();
   }
 
@@ -58,8 +71,59 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
     await prefs.remove('auth_token');
     _authToken = null;
     _isLoggedIn = false;
+
+    _currentUser = null; // Clear user on logout
+    _isAdmin = false; // Clear admin status on logout
+
     _issues = [];
     notifyListeners();
+  }
+
+  // New method to fetch current user details (including admin status)
+  Future<void> fetchUserDetails() async {
+    if (_authToken == null) {
+      _currentUser = null;
+      _isAdmin = false;
+      notifyListeners();
+      return;
+    }
+
+    try {
+      print('Fetching user details with token: $_authToken');
+
+      final url = Uri.parse('${AppConstants.baseUrl}/user/');
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Token $_authToken', // Assuming Token authentication
+        },
+      );
+
+      if (response.statusCode == 200) {
+        print('User details fetched successfully: ${response.body}');
+        final Map<String, dynamic> responseData = json.decode(response.body);
+        _currentUser = User.fromJson(responseData); //parse the JSON response into a User object
+        _isAdmin = _currentUser!.isStaff; // Set admin status based on is_staff flag
+
+        print(_isAdmin ? '###User is an admin' : 'User is not an admin');
+
+      } else if (response.statusCode == 401) {
+        // Token invalid or expired, force logout
+        await clearAuthToken();
+      } else {
+        print('Failed to fetch user details: ${response.statusCode} ${response.body}');
+        _currentUser = null;
+        _isAdmin = false;
+        // Optionally, handle specific errors here
+      }
+    } catch (e) {
+      print('Error fetching user details: $e');
+      _currentUser = null;
+      _isAdmin = false;
+      // Handle network errors
+    }
+    notifyListeners(); // Notify after user details are loaded/updated
   }
 
   // methods to modify state and notify listeners
@@ -137,4 +201,56 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
       notifyListeners(); // ensure the UI updates regardless of success or failure.
     }
   }
+
+  // Day 12: New method to update issue status for admin dashboard
+  Future<bool> updateIssueStatus(String issueId, String newStatus) async {
+    if (_authToken == null || !_isAdmin) { // Only allow admin to update
+      _issuesErrorMessage = 'Access denied. You must be an administrator and logged in to update status.';
+      notifyListeners();
+      return false;
+    }
+
+    final url = Uri.parse('${AppConstants.baseUrl}/issues/$issueId/');
+    try {
+      final response = await http.patch( // Use PATCH for partial update
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Token $_authToken',
+        },
+        body: json.encode({'status': newStatus}),
+      );
+
+      if (response.statusCode == 200) {
+        // Find the issue in the current list and update its status locally
+        // This avoids a full re-fetch which is more efficient.
+        // indexWhere returns the index of the first match or -1 if not found.
+        int index = _issues.indexWhere((issue) => issue.id == issueId);
+        if (index != -1) {  
+          // Create a new Issue object with the updated status
+          // response.body contains the updated issue as JSON.
+          // json.decode(response.body) parses it into a Map<String, dynamic>.
+          // Issue.fromJson(...) creates a fresh Issue object from the response.
+          _issues[index] = Issue.fromJson(json.decode(response.body));
+        }
+        notifyListeners(); // Notify UI that a specific issue might have changed
+        return true;
+      } else if (response.statusCode == 401 || response.statusCode == 403) { // 403 Forbidden for insufficient permissions
+        _issuesErrorMessage = 'Unauthorized to update status. Please log in as an administrator.';
+        await clearAuthToken(); // Token invalid or not admin, force logout
+        notifyListeners();
+        return false;
+      } else {
+        final errorData = json.decode(response.body);
+        _issuesErrorMessage = 'Failed to update status: ${errorData['detail'] ?? response.statusCode}';
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _issuesErrorMessage = 'Network error during status update: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
 }
