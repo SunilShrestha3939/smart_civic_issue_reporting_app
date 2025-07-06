@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart'; 
 import 'package:smart_civic_app/providers/app_provider.dart';
+import 'package:smart_civic_app/screens/admin_dashboard_screen.dart';
 import 'package:smart_civic_app/screens/home_screen.dart';
-import 'package:smart_civic_app/screens/login_screen.dart'; 
+import 'package:smart_civic_app/screens/issue_map_screen.dart';
+import 'package:smart_civic_app/screens/login_screen.dart';
+import 'package:smart_civic_app/screens/view_issues_screen.dart'; 
 
 class SplashScreen extends StatefulWidget { //stateful because it has a state that can change over time, such as showing a loading indicator or navigating to another screen after a delay.
   const SplashScreen({super.key});
@@ -43,6 +46,19 @@ class _SplashScreenState extends State<SplashScreen> {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const HomeScreen()),
       );
+    } else if (!appProvider.isLoggedIn && appProvider.forcedLogout) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Session expired. Please log in again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+
+        Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+      });
     } else {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const LoginScreen()),

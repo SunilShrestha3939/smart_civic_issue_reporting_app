@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:smart_civic_app/models/issue.dart';
 import 'package:smart_civic_app/screens/issue_detail_screen.dart';
 import 'package:smart_civic_app/providers/app_provider.dart';
+import 'package:smart_civic_app/screens/issue_map_screen.dart';
 
 // class ViewIssuesScreen extends StatelessWidget {
 //   const ViewIssuesScreen({super.key});
@@ -104,7 +105,9 @@ class _ViewIssuesScreenState extends State<ViewIssuesScreen> {
           );
         }
 
-        if (appProvider.issues.isEmpty) {
+        // We will show list if issues are empty and error is null, but also allow map view
+        // if issues are empty to potentially show current location
+        if (appProvider.issues.isEmpty && appProvider.issuesErrorMessage == null) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -120,142 +123,162 @@ class _ViewIssuesScreenState extends State<ViewIssuesScreen> {
                   onPressed: _refreshIssues,
                   child: const Text('Refresh'),
                 ),
+                const SizedBox(height: 20),
+                ElevatedButton.icon( // Button to view on map even if list is empty
+                  onPressed: () {
+                    Navigator.of(context).push(MaterialPageRoute(
+                      builder: (context) => IssueMapScreen(issues: appProvider.issues), // Pass current issues
+                    ));
+                  },
+                  icon: const Icon(Icons.map),
+                  label: const Text('View on Map'),
+                ),
               ],
             ),
           );
         }
 
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _selectedStatusFilter,
-                      decoration: const InputDecoration(
-                        labelText: 'Filter by Status',
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      ),
-                      hint: const Text('All Statuses'),
-                      items: [
-                        const DropdownMenuItem<String>(value: null, child: Text('All Statuses')),
-                        const DropdownMenuItem<String>(value: 'Pending', child: Text('Pending')),
-                        const DropdownMenuItem<String>(value: 'In Progress', child: Text('In Progress')),
-                        const DropdownMenuItem<String>(value: 'Resolved', child: Text('Resolved')),
-                      ],
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          _selectedStatusFilter = newValue;
-                          _refreshIssues(); // Re-fetch when filter changes
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // When unselected (default):The user sees all issues reported by anyone.
-                  // When tapped (selected):The app fetches and displays only issues reported by the current user.
-                  // The icon changes:
-                  // 👤 Icons.person → when active
-                  // 👤 Icons.person_outline → when inactive
-                  // If the user long presses the chip, the tooltip appears with a hint:
-                  // ➤ "Show only issues reported by me"
-                  Tooltip(  //explaining FilterChip purpose on long press.
-                    message: 'Show only issues reported by me',
-                    child: FilterChip(
-                      label: const Text('My Issues'),
-                      selected: _showMyIssues,
-                      onSelected: (bool selected) {
-                        setState(() {
-                          _showMyIssues = selected;
-                          _refreshIssues(); // Re-fetch when filter changes
-                        });
-                      },
-                      avatar: Icon(_showMyIssues ? Icons.person : Icons.person_outline),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: RefreshIndicator( // Added for pull-to-refresh
-                onRefresh: () async {
-                    _refreshIssues(); // Triggers the setState and data fetch
-                  },
-                //ListView.builder: This is efficient for long lists. It only builds the widgets that are currently visible on the screen, recycling them as the user scrolls.
-                // itemCount: The total number of items in the list.
-                // itemBuilder: A callback function that's called for each item's index to build its widget.
-                child: ListView.builder(
-                  itemCount: appProvider.issues.length,
-                  itemBuilder: (context, index) {
-                    final issue = appProvider.issues[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      elevation: 3,
-                      //Inkwell wraps the Card widget to provide a ripple effect when tapped.
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(  // its builder function provides the context and returns the IssueDetailScreen widget.
-                              builder: (context) => IssueDetailScreen(issue: issue),  // Pass the issue object
-                            ),
-                          );
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                issue.title,
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                issue.description.length > 100
-                                    ? '${issue.description.substring(0, 100)}...' // Truncate description
-                                    : issue.description,
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Status: ${issue.status}',
-                                    style: TextStyle(
-                                      color: issue.status == 'Pending' ? Colors.orange
-                                          : issue.status == 'Resolved' ? Colors.green
-                                          : Colors.blue,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Text('Category: ${issue.category}', style: TextStyle(color: Colors.grey[600])),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Align(
-                                alignment: Alignment.bottomRight,
-                                child: Text(
-                                  'Reported on: ${issue.reportedAt.toLocal().toString().split(' ')[0]}',
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                ),
-                              ),
-                            ],
-                          ),
+        return Scaffold(
+          body: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedStatusFilter,
+                        decoration: const InputDecoration(
+                          labelText: 'Filter by Status',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
+                        hint: const Text('All Statuses'),
+                        items: [
+                          const DropdownMenuItem<String>(value: null, child: Text('All Statuses')),
+                          const DropdownMenuItem<String>(value: 'Pending', child: Text('Pending')),
+                          const DropdownMenuItem<String>(value: 'In Progress', child: Text('In Progress')),
+                          const DropdownMenuItem<String>(value: 'Resolved', child: Text('Resolved')),
+                        ],
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _selectedStatusFilter = newValue;
+                            _refreshIssues(); // Re-fetch when filter changes
+                          });
+                        },
                       ),
-                    );
-                  },
+                    ),
+                    const SizedBox(width: 8),
+                    // When unselected (default):The user sees all issues reported by anyone.
+                    // When tapped (selected):The app fetches and displays only issues reported by the current user.
+                    // The icon changes:
+                    // 👤 Icons.person → when active
+                    // 👤 Icons.person_outline → when inactive
+                    // If the user long presses the chip, the tooltip appears with a hint:
+                    // ➤ "Show only issues reported by me"
+                    Tooltip(  //explaining FilterChip purpose on long press.
+                      message: 'Show only issues reported by me',
+                      child: FilterChip(
+                        label: const Text('My Issues'),
+                        selected: _showMyIssues,
+                        onSelected: (bool selected) {
+                          setState(() {
+                            _showMyIssues = selected;
+                            _refreshIssues(); // Re-fetch when filter changes
+                          });
+                        },
+                        avatar: Icon(_showMyIssues ? Icons.person : Icons.person_outline),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
+              Expanded(
+                child: RefreshIndicator( // Added for pull-to-refresh
+                  onRefresh: () async {
+                      _refreshIssues(); // Triggers the setState and data fetch
+                    },
+                  //ListView.builder: This is efficient for long lists. It only builds the widgets that are currently visible on the screen, recycling them as the user scrolls.
+                  // itemCount: The total number of items in the list.
+                  // itemBuilder: A callback function that's called for each item's index to build its widget.
+                  child: ListView.builder(
+                    itemCount: appProvider.issues.length,
+                    itemBuilder: (context, index) {
+                      final issue = appProvider.issues[index];
+                      return Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        elevation: 3,
+                        //Inkwell wraps the Card widget to provide a ripple effect when tapped.
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(  // its builder function provides the context and returns the IssueDetailScreen widget.
+                                builder: (context) => IssueDetailScreen(issue: issue),  // Pass the issue object
+                              ),
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  issue.title,
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  issue.description.length > 100
+                                      ? '${issue.description.substring(0, 100)}...' // Truncate description
+                                      : issue.description,
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Status: ${issue.status}',
+                                      style: TextStyle(
+                                        color: issue.status == 'Pending' ? Colors.orange
+                                            : issue.status == 'Resolved' ? Colors.green
+                                            : Colors.blue,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Text('Category: ${issue.category}', style: TextStyle(color: Colors.grey[600])),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Align(
+                                  alignment: Alignment.bottomRight,
+                                  child: Text(
+                                    'Reported on: ${issue.reportedAt.toLocal().toString().split(' ')[0]}',
+                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+          // floatingActionButton: appProvider.issues.isNotEmpty ? FloatingActionButton.extended(
+          //   onPressed: () {
+          //     Navigator.of(context).push(MaterialPageRoute(
+          //       builder: (context) => IssueMapScreen(issues: appProvider.issues),
+          //     ));
+          //   },
+          //   label: const Text('View on Map'),
+          //   icon: const Icon(Icons.map),
+          //   backgroundColor: Colors.blue,
+          // ) : null,
         );
       },
     );
   }
 }
-
-

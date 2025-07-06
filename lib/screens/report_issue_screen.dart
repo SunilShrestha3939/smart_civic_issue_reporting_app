@@ -80,7 +80,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
 
       // Add Authorization header
       //This adds the authorization header with the token. for authorization request 
-      request.headers['Authorization'] = 'Token $authToken'; // Or 'Bearer $authToken' for JWT
+      request.headers['Authorization'] = 'Bearer $authToken'; // Or 'Bearer $authToken' for JWT
 
       // Add text fields to the request
       // request.fields['title'] = _titleController.text;

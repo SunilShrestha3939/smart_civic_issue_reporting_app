@@ -15,7 +15,8 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
   ThemeMode _themeMode = ThemeMode.light;
 
   String? _authToken; 
-  bool _isLoggedIn = false; 
+  bool _isLoggedIn = false;
+  bool _forcedLogout = false; // Track if a forced logout is needed 
 
   User? _currentUser; // Current user object
   bool _isAdmin = false; // track if the user is an admin
@@ -29,7 +30,7 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
   ThemeMode get themeMode => _themeMode;
   String? get authToken => _authToken;
   bool get isLoggedIn => _isLoggedIn;
-
+  bool get forcedLogout => _forcedLogout; 
   User? get currentUser => _currentUser;
   bool get isAdmin => _isAdmin;
 
@@ -66,16 +67,17 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
   }
 
   // Method to clear the token (logout)
-  Future<void> clearAuthToken() async {
+  Future<void> clearAuthToken({bool forceLogout = false}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     _authToken = null;
     _isLoggedIn = false;
 
-    _currentUser = null; // Clear user on logout
-    _isAdmin = false; // Clear admin status on logout
-
+    _currentUser = null;
+    _isAdmin = false;
     _issues = [];
+    _forcedLogout = forceLogout;
+
     notifyListeners();
   }
 
@@ -90,27 +92,33 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
 
     try {
       print('Fetching user details with token: $_authToken');
+      print('Fetching user details from: ${AppConstants.baseUrl}/user/');
 
       final url = Uri.parse('${AppConstants.baseUrl}/user/');
       final response = await http.get(
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Token $_authToken', // Assuming Token authentication
+          'Authorization': 'Bearer $_authToken', // Assuming Token authentication
         },
       );
 
+      print('Response status (User): ${response.statusCode}');
+
       if (response.statusCode == 200) {
         print('User details fetched successfully: ${response.body}');
-        final Map<String, dynamic> responseData = json.decode(response.body);
-        _currentUser = User.fromJson(responseData); //parse the JSON response into a User object
-        _isAdmin = _currentUser!.isStaff; // Set admin status based on is_staff flag
+        final List<dynamic> responseList = json.decode(response.body);
+       if (responseList.isNotEmpty) {
+        final Map<String, dynamic> userJson = responseList[0];  // Use the first user
+        _currentUser = User.fromJson(userJson);
+        _isAdmin = _currentUser!.isStaff;
+      } // Set admin status based on is_staff flag
 
-        print(_isAdmin ? '###User is an admin' : 'User is not an admin');
+        print(_isAdmin ? '###User is an admin' : '###User is not an admin');
 
       } else if (response.statusCode == 401) {
         // Token invalid or expired, force logout
-        await clearAuthToken();
+        await clearAuthToken(forceLogout: true);
       } else {
         print('Failed to fetch user details: ${response.statusCode} ${response.body}');
         _currentUser = null;
@@ -169,18 +177,27 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
         url += '?${Uri.encodeQueryComponent(queryParams.entries.map((e) => '${e.key}=${e.value}').join('&'))}';
       }
 
+      print('Fetching issues from URL: $url'); // Debugging log
+      
       final response = await http.get(
         Uri.parse(url),
         headers: {
           'Content-Type': 'application/json', // so that server knows we are sending JSON
-          'Authorization': 'Token $_authToken', // Authorization header with the token, for user authentication
+          'Authorization': 'Bearer $_authToken', // Authorization header with the token, for user authentication
         },
       );
 
+      print('Response status (Issues): ${response.statusCode}'); // Debugging log
+
       if (response.statusCode == 200) {
-        final Map<String, dynamic> responseData = json.decode(response.body);  // parse the JSON response body into a List of dynamic objects
+        
+        print('Issues fetched successfully: ${response.body}'); // Debugging log
+        
+        // final Map<String, dynamic> responseData = json.decode(response.body);  // parse the JSON response body into a List of dynamic objects
         // responseData.map((json) => Issue.fromJson(json)).toList(): It iterates through each JSON object in the list, uses our Issue.fromJson factory constructor to convert it into an Issue object, and then collects all these Issue objects into a List<Issue>.
-        final List<dynamic> issuesJson = responseData['results']; // ← adapt this key as per your API
+
+        // final List<dynamic> issuesJson = responseData['results']; // ← adapt this key as per your API
+        final List<dynamic> issuesJson = json.decode(response.body);
         _issues = issuesJson.map((json) => Issue.fromJson(json)).toList();
         _issuesErrorMessage = null;
       } else if (response.statusCode == 401) {
@@ -210,13 +227,15 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
       return false;
     }
 
+    print('Updating issue $issueId status to $newStatus'); // Debugging log
+
     final url = Uri.parse('${AppConstants.baseUrl}/issues/$issueId/');
     try {
       final response = await http.patch( // Use PATCH for partial update
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Token $_authToken',
+          'Authorization': 'Bearer $_authToken',
         },
         body: json.encode({'status': newStatus}),
       );
@@ -237,7 +256,7 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
         return true;
       } else if (response.statusCode == 401 || response.statusCode == 403) { // 403 Forbidden for insufficient permissions
         _issuesErrorMessage = 'Unauthorized to update status. Please log in as an administrator.';
-        await clearAuthToken(); // Token invalid or not admin, force logout
+        await clearAuthToken(forceLogout: true); // Token invalid or not admin, force logout
         notifyListeners();
         return false;
       } else {

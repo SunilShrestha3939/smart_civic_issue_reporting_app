@@ -7,8 +7,8 @@ class Issue {
   final String category;
   final String status;
   final String? imageUrl; // Optional image URL
-  final double? latitude; // Optional latitude
-  final double? longitude; // Optional longitude
+  final double latitude; // Optional latitude
+  final double longitude; // Optional longitude
   final DateTime reportedAt;
 
   Issue({
@@ -18,8 +18,8 @@ class Issue {
     required this.category,
     required this.status,
     this.imageUrl,
-    this.latitude,
-    this.longitude,
+    required this.latitude,
+    required this.longitude,
     required this.reportedAt,
   });
 
@@ -32,7 +32,7 @@ class Issue {
     title: json['issue_type'] ?? 'No Title', // Use issue_type instead of title
     description: json['description'] ?? '',
     category: json['issue_type'] ?? 'General', // Use issue_type as category fallback
-    status: json['status'] ?? '',
+    status: json['status'] ?? 'Pending',
     imageUrl: json['image'] ?? '',
     latitude: double.tryParse(json['latitude'].toString()) ?? 0.0,
     longitude: double.tryParse(json['longitude'].toString()) ?? 0.0,

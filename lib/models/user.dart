@@ -15,13 +15,13 @@ class User {
 
   // Factory constructor to create a User from a JSON map
   factory User.fromJson(Map<String, dynamic> json) {
-    return User(
-      id: json['id'] as int,
-      username: json['username'] as String,
-      email: json['email'] as String,
-      isStaff: json['is_staff'] as bool? ?? false, // Default to false if not provided
-    );
-  }
+  return User(
+    id: json['id'] as int,
+    username: json['name'] as String? ?? '', 
+    email: json['email'] as String? ?? '',
+    isStaff: json['is_staff'] as bool? ?? false,
+  );
+}
 
   // Method to convert User to JSON map (less common for client-side)
   Map<String, dynamic> toJson() {

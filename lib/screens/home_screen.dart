@@ -5,6 +5,7 @@ import 'package:smart_civic_app/screens/view_issues_screen.dart';
 import 'package:smart_civic_app/screens/admin_dashboard_screen.dart'; // Import AdminDashboardScreen
 import 'package:smart_civic_app/providers/app_provider.dart';
 import 'package:smart_civic_app/screens/login_screen.dart';
+import 'package:smart_civic_app/screens/issue_map_screen.dart'; // Import IssueMapScreen
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -109,17 +110,49 @@ class _HomeScreenState extends State<HomeScreen> {
             unselectedItemColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[400] : Colors.grey, // Improve visibility in dark mode
             onTap: _onItemTapped,
           ),
-          floatingActionButton: _selectedIndex == 0 // Show FAB only on 'Issues' tab
-              ? FloatingActionButton( //When pressed, it changes the _selectedIndex to 1, effectively switching to the "Report" tab. This provides a quick way to report an issue from the main issues list.
+          // floatingActionButton: _selectedIndex == 0 // Show FAB only on 'Issues' tab
+          //     ? FloatingActionButton( //When pressed, it changes the _selectedIndex to 1, effectively switching to the "Report" tab. This provides a quick way to report an issue from the main issues list.
+          //         onPressed: () {
+          //           setState(() {
+          //             _selectedIndex = 1; // Navigate to 'Report' tab
+          //           });
+          //         },
+          //         backgroundColor: Colors.blue,
+          //         child: const Icon(Icons.add, color: Colors.white),
+          //       )
+          //     : null,// Don't show FAB on other tabs
+          floatingActionButton: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (_selectedIndex == 0)
+                FloatingActionButton(
                   onPressed: () {
                     setState(() {
-                      _selectedIndex = 1; // Navigate to 'Report' tab
+                      _selectedIndex = 1; // Switch to report tab
                     });
                   },
                   backgroundColor: Colors.blue,
                   child: const Icon(Icons.add, color: Colors.white),
-                )
-              : null,// Don't show FAB on other tabs
+                  tooltip: 'Report New Issue',
+                ),
+                SizedBox(height: 12), 
+                if (_selectedIndex == 0 && appProvider.issues.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12.0),
+                  child: FloatingActionButton.extended(
+                    onPressed: () {
+                      Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => IssueMapScreen(issues: appProvider.issues),
+                      ));
+                    },
+                    label: const Text('View on Map'),
+                    icon: const Icon(Icons.map),
+                    backgroundColor: Colors.blue,
+                  ),
+                ),
+            ],
+          ),
         );
       },
     );
