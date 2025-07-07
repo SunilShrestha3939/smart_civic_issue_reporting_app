@@ -16,7 +16,9 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
 
   String? _authToken; 
   bool _isLoggedIn = false;
+
   bool _forcedLogout = false; // Track if a forced logout is needed 
+  bool _isInitialized = false; // Track if the provider has been initialized
 
   User? _currentUser; // Current user object
   bool _isAdmin = false; // track if the user is an admin
@@ -30,7 +32,10 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
   ThemeMode get themeMode => _themeMode;
   String? get authToken => _authToken;
   bool get isLoggedIn => _isLoggedIn;
+
   bool get forcedLogout => _forcedLogout; 
+  bool get isInitialized => _isInitialized; 
+
   User? get currentUser => _currentUser;
   bool get isAdmin => _isAdmin;
 
@@ -52,6 +57,8 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
     if (_isLoggedIn) {
       await fetchUserDetails(); // Fetch user details if already logged in
     }
+
+    _isInitialized = true; // token check completed to ensure that SplashScreen waits until fetchUserDetails is done.
     notifyListeners(); // Notify listeners of initial state
   }
 
@@ -116,6 +123,9 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
 
         print(_isAdmin ? '###User is an admin' : '###User is not an admin');
 
+        // SharedPreferences prefs = await SharedPreferences.getInstance();
+        // await prefs.setString('user_data', json.encode(_currentUser!.toJson()));
+
       } else if (response.statusCode == 401) {
         // Token invalid or expired, force logout
         await clearAuthToken(forceLogout: true);
@@ -174,7 +184,9 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
       // it wraps all query parameters into a single string, ensuring that the URL is properly formatted. like ?status=open&user_specific=true
       if (queryParams.isNotEmpty) {
         // final uri = Uri.parse('${AppConstants.baseUrl}/issues/').replace(queryParameters: queryParams);
-        url += '?${Uri.encodeQueryComponent(queryParams.entries.map((e) => '${e.key}=${e.value}').join('&'))}';
+        // url += '?${Uri.encodeQueryComponent(queryParams.entries.map((e) => '${e.key}=${e.value}').join('&'))}';
+        url += '?${queryParams.entries.map((e) => '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}').join('&')}';
+
       }
 
       print('Fetching issues from URL: $url'); // Debugging log
@@ -200,6 +212,8 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
         final List<dynamic> issuesJson = json.decode(response.body);
         _issues = issuesJson.map((json) => Issue.fromJson(json)).toList();
         _issuesErrorMessage = null;
+
+        
       } else if (response.statusCode == 401) {
         _issuesErrorMessage = 'Unauthorized. Please log in again.';
         _issues = [];

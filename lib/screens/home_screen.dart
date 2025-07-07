@@ -24,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
     List<Widget> options = [
       const ViewIssuesScreen(),
       const ReportIssueScreen(),
-      const _ProfileSettingsScreen(),
+      // const _ProfileSettingsScreen(),
     ];
     if (isAdmin) {
       options.add(const AdminDashboardScreen()); // Add admin dashboard if user is admin
@@ -95,10 +95,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icon(Icons.add_circle),
                 label: 'Report',
               ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.settings),
-                label: 'Settings',
-              ),
+              // const BottomNavigationBarItem(
+              //   icon: Icon(Icons.settings),
+              //   label: 'Settings',
+              // ),
               if (isAdmin) // Conditionally add Admin tab
                 const BottomNavigationBarItem(
                   icon: Icon(Icons.admin_panel_settings),
@@ -160,45 +160,45 @@ class _HomeScreenState extends State<HomeScreen> {
 }  
 
 // New widget to demonstrate counter and theme toggle
-class _ProfileSettingsScreen extends StatelessWidget {
-  const _ProfileSettingsScreen({super.key});
+// class _ProfileSettingsScreen extends StatelessWidget {
+//   const _ProfileSettingsScreen({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    // Using Consumer to rebuild only this part when AppProvider changes
-    return Consumer<AppProvider>(
-      builder: (context, appProvider, child) {
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Counter Value: ${appProvider.counter}', // Access counter from provider
-                style: const TextStyle(fontSize: 24),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  appProvider.incrementCounter(); // Call method on provider
-                },
-                child: const Text('Increment Counter'),
-              ),
-              const SizedBox(height: 40),
-              Text(
-                'Current Theme: ${appProvider.themeMode == ThemeMode.light ? 'Light' : 'Dark'}',
-                style: const TextStyle(fontSize: 20),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  appProvider.toggleTheme(); // Call method on provider
-                },
-                child: const Text('Toggle Theme'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     // Using Consumer to rebuild only this part when AppProvider changes
+//     return Consumer<AppProvider>(
+//       builder: (context, appProvider, child) {
+//         return Center(
+//           child: Column(
+//             mainAxisAlignment: MainAxisAlignment.center,
+//             children: [
+//               Text(
+//                 'Counter Value: ${appProvider.counter}', // Access counter from provider
+//                 style: const TextStyle(fontSize: 24),
+//               ),
+//               const SizedBox(height: 20),
+//               ElevatedButton(
+//                 onPressed: () {
+//                   appProvider.incrementCounter(); // Call method on provider
+//                 },
+//                 child: const Text('Increment Counter'),
+//               ),
+//               const SizedBox(height: 40),
+//               Text(
+//                 'Current Theme: ${appProvider.themeMode == ThemeMode.light ? 'Light' : 'Dark'}',
+//                 style: const TextStyle(fontSize: 20),
+//               ),
+//               const SizedBox(height: 20),
+//               ElevatedButton(
+//                 onPressed: () {
+//                   appProvider.toggleTheme(); // Call method on provider
+//                 },
+//                 child: const Text('Toggle Theme'),
+//               ),
+//             ],
+//           ),
+//         );
+//       },
+//     );
+//   }
+// }

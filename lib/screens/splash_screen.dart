@@ -20,16 +20,21 @@ class _SplashScreenState extends State<SplashScreen> {
   //called exactly once when the StatefulWidget is inserted into the widget tree. It's the perfect place to perform one-time setup
   void initState() {
     super.initState();
-    _checkAuthStatusAndNavigate();
+    // Wait for the first frame to avoid context issues
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _handleNavigation();
+    });
+    
   }
 
-  void _checkAuthStatusAndNavigate() async {
-    // delay to display splash screen
-    // Future.delayed: This function allows us to execute a piece of code after a specified duration. It's commonly used for splash screens, simulating network calls, or other time-sensitive operations.
-    await Future.delayed(const Duration(seconds: 2)); 
-
+  Future<void> _handleNavigation() async {
     // Access AppProvider to check login status
     final appProvider = Provider.of<AppProvider>(context, listen: false);
+
+    // Wait until initialization is done
+    while (!appProvider.isInitialized) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
 
     // Ensure the token has been loaded (AppProvider's constructor does this)
     // We wait for the initial load process to complete.
@@ -48,16 +53,15 @@ class _SplashScreenState extends State<SplashScreen> {
       );
     } else if (!appProvider.isLoggedIn && appProvider.forcedLogout) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Session expired. Please log in again.'),
             backgroundColor: Colors.red,
           ),
         );
-
         Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-      );
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
       });
     } else {
       Navigator.of(context).pushReplacement(
@@ -68,18 +72,14 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return  Scaffold(
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // You can add your app logo here
-            Icon(
-              Icons.location_city,
-              size: 100,
-              color: Colors.blue,
-            ),
+            Image.asset('assets/images/logo.png', height: 200),
             SizedBox(height: 20),
+            
             Text(
               'Smart Civic App',
               style: TextStyle(

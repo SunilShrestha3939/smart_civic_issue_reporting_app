@@ -157,7 +157,7 @@ class _ViewIssuesScreenState extends State<ViewIssuesScreen> {
                         items: [
                           const DropdownMenuItem<String>(value: null, child: Text('All Statuses')),
                           const DropdownMenuItem<String>(value: 'Pending', child: Text('Pending')),
-                          const DropdownMenuItem<String>(value: 'In Progress', child: Text('In Progress')),
+                          const DropdownMenuItem<String>(value: 'In_Progress', child: Text('In Progress')),
                           const DropdownMenuItem<String>(value: 'Resolved', child: Text('Resolved')),
                         ],
                         onChanged: (String? newValue) {
