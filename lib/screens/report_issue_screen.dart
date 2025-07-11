@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http; // Import http
 import 'package:provider/provider.dart';
 import 'package:smart_civic_app/providers/app_provider.dart';
 import 'package:smart_civic_app/utils/constants.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ReportIssueScreen extends StatefulWidget {
   const ReportIssueScreen({super.key});
@@ -23,7 +24,6 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
   String? _selectedCategory; // Holds the selected category value
   final List<String> _categories = [
     'potholes',
-    'traffic_light',
     'streetlight',
     'water_leakage',
     'garbage',
@@ -83,12 +83,28 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
       request.headers['Authorization'] = 'Bearer $authToken'; // Or 'Bearer $authToken' for JWT
 
       // Add text fields to the request
-      // request.fields['title'] = _titleController.text;
+      request.fields['title'] = _titleController.text;
       request.fields['description'] = _descriptionController.text;
       request.fields['issue_type'] = _selectedCategory!; // ! indicates it won't be null due to validator
       request.fields['latitude'] = _currentPosition!.latitude.toString();
       request.fields['longitude'] = _currentPosition!.longitude.toString();
-      request.fields['reported_by'] = '1'; // Assuming '1' is the ID of the user reporting defaultly, you can change this to the actual user ID if needed.
+
+
+      // Debugging line to see the user ID
+      // SharedPreferences prefs = await SharedPreferences.getInstance();
+      // int? userId = prefs.getInt('user_id');
+      // print('User ID from SharedPreferences: $userId');
+
+      // if (userId != null) {
+      //   request.fields['reported_by'] = userId.toString(); // Use the user ID from SharedPreferences
+      // } else {
+      //   ScaffoldMessenger.of(context).showSnackBar(
+      //     const SnackBar(content: Text('User ID not found. Please log in again.')),
+      //   );
+      //   setState(() { _isLoading = false; });
+      //   return;
+      // }
+      // request.fields['reported_by'] = '1'; // Assuming '1' is the ID of the user reporting defaultly, you can change this to the actual user ID if needed.
 
       // Add the image file to the request
       request.files.add(

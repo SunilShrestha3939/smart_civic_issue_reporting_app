@@ -40,6 +40,7 @@ dependencies:
   flutter_map: ^7.0.0
   latlong2: ^0.9.1
   flutter_map_marker_cluster: ^1.4.0
+  flutter_local_notifications: ^19.3.0
 
 
 dev_dependencies:

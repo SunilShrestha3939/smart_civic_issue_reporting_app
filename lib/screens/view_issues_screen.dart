@@ -4,36 +4,9 @@ import 'package:smart_civic_app/models/issue.dart';
 import 'package:smart_civic_app/screens/issue_detail_screen.dart';
 import 'package:smart_civic_app/providers/app_provider.dart';
 import 'package:smart_civic_app/screens/issue_map_screen.dart';
-
-// class ViewIssuesScreen extends StatelessWidget {
-//   const ViewIssuesScreen({super.key});
-
-//   // Generate some dummy issues for demonstration
-//   List<Issue> _generateDummyIssues() {
-//     return List.generate(10, (index) {
-//       return Issue(
-//         id: 'issue_${index + 1}',
-//         title: 'Pothole on Main Street ${index + 1}',
-//         description:
-//             'Large pothole causing issues for vehicles and pedestrians near the intersection of Main St and Oak Ave. It has been there for a while and needs urgent attention. Its size is about 2x2 feet.',
-//         category: index % 3 == 0
-//             ? 'Road Issue'
-//             : index % 3 == 1
-//                 ? 'Sanitation'
-//                 : 'Streetlight',
-//         status: index % 2 == 0 ? 'Pending' : 'In Progress',
-//         imageUrl: index % 2 == 0
-//             ? 'https://placehold.co/600x400/FF0000/FFFFFF?text=Pothole+Image'
-//             : null, // Dummy image URL
-//         latitude: 27.7000 + (index * 0.001), // Dummy latitude
-//         longitude: 85.3200 + (index * 0.001), // Dummy longitude
-//         reportedAt: DateTime.now().subtract(Duration(days: index)),
-//       );
-//     });
-//   }
-
-
-
+import 'package:smart_civic_app/services/notification_service.dart';
+import 'dart:async';
+import 'package:smart_civic_app/main.dart';
 
 class ViewIssuesScreen extends StatefulWidget {
   const ViewIssuesScreen({super.key});
@@ -48,26 +21,194 @@ class _ViewIssuesScreenState extends State<ViewIssuesScreen> {
 
   // State variables to hold the current filter selections
   String? _selectedStatusFilter; // State variable for selected status
-  bool _showMyIssues = false; // State variable for "My Issues" toggle
+  bool _showMyIssues = false; // State variable for "My Issues" toggle i.e only show issues reported by the current user 
+
+  //
+  // Timer object that will repeatedly call checkForStatusChanges().
+  Timer? _pollingTimer;
+  // Cache to store issue statuses to detect changes
+  // A Map to store the last known status of each issue. This is crucial for detecting changes.
+  Map<String, String> _issueStatusCache = {}; // issueId -> status
+  //
 
   @override
   void initState() {
     super.initState();
-    // Initialize the future here. We use Future.microtask to ensure provider is available.
-    _fetchIssuesFuture = Future.microtask(() =>
-        Provider.of<AppProvider>(context, listen: false).fetchIssues());
+    // Use addPostFrameCallback to ensure context is fully available
+    // and to perform initial fetch after the first frame has rendered.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initialLoadAndPollingSetup();
+    });
+  }
+
+  Future<void> _initialLoadAndPollingSetup() async {
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+
+    // 1. Perform the initial fetch for the main list display (with current filters)
+    // This will set appProvider.isIssuesLoading = true.
+    print('Initial fetch for main list with userSpecific: $_showMyIssues');
+    await appProvider.fetchIssues(
+      status: _selectedStatusFilter,
+      userSpecific: _showMyIssues,
+    );
+
+    // 2. After the initial fetch, populate the cache *from the fetched issues*.
+    // And then start the polling for *user-specific* issue changes.
+    // Ensure we fetch user-specific issues for the cache, as notifications are for "my issues".
+    // This *might* be a redundant fetch if _showMyIssues is already true for the main list,
+    // but it ensures the cache is based on issues the user reported.
+    print('Fetching user-specific issues for polling cache.');
+    await appProvider.fetchIssues(userSpecific: true); // Re-fetch specific for cache
+
+    // Populate cache with the issues that were just fetched (which should be only current user's issues)
+    // We iterate directly over appProvider.issues because fetchIssues(userSpecific: true)
+    // is assumed to have already filtered them.
+    for (var issue in appProvider.issues) { // appProvider.issues should already contain only "my issues" now
+      _issueStatusCache[issue.id] = issue.status;
+    }
+    print('Initial issue status cache populated with ${appProvider.issues.length} user issues.');
+
+    // Start polling *after* initial data is loaded and cached.
+    _pollingTimer = Timer.periodic(const Duration(seconds: 30), (_) => checkForStatusChanges());
+    print('Polling started.');
+  }
+
+  Future<void> checkForStatusChanges() async {
+    print('Polling check at ${DateTime.now()}');
+    try {
+      final issueProvider = Provider.of<AppProvider>(context, listen: false);
+
+      // Fetch ONLY current user's issues for status checking.
+      // This fetch should ideally not block the main UI if 'isIssuesLoading' is handled carefully in AppProvider
+      // (e.g., a separate loading state for background polls, or no loading state if it's a silent background fetch).
+      await issueProvider.fetchIssues(userSpecific: true);
+
+      // The issues in issueProvider.issues are already the current user's issues
+      // because of the preceding fetchIssues(userSpecific: true) call.
+      final List<Issue> currentUserIssuesForPolling = issueProvider.issues;
+
+      print('Checking ${currentUserIssuesForPolling.length} user issues for status changes.');
+
+      for (var issue in currentUserIssuesForPolling) {
+        final previousStatus = _issueStatusCache[issue.id];
+
+        if (previousStatus != null && previousStatus != issue.status) {
+          print('Status changed for ${issue.id} from $previousStatus to ${issue.status}');
+          await notificationService.showIssueStatusNotification(
+            issueId: issue.id,
+            issueTitle: issue.title,
+            newStatus: issue.status,
+          );
+          print('Notification triggered for issue ID: ${issue.id}');
+        }
+
+        _issueStatusCache[issue.id] = issue.status; // update cache
+      }
+    } catch (e) {
+      print('Polling error: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
   }
 
   // Method to re-fetch issues based on filters
   void _refreshIssues() {
     setState(() {
-      _fetchIssuesFuture = Provider.of<AppProvider>(context, listen: false)
+      // This will trigger the CircularProgressIndicator because fetchIssues
+      // will likely set appProvider.isIssuesLoading to true.
+      Provider.of<AppProvider>(context, listen: false)
           .fetchIssues(
-            status: _selectedStatusFilter, // Pass selected status
-            userSpecific: _showMyIssues, // Pass "My Issues" toggle state
+            status: _selectedStatusFilter,
+            userSpecific: _showMyIssues,
           );
+      // We don't need _fetchIssuesFuture anymore as we directly trigger the fetch
+      // and rely on the Consumer to rebuild when appProvider.isIssuesLoading changes.
     });
   }
+
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   // Initialize the future here. We use Future.microtask to ensure provider is available.
+  //   //Future.microtask is used to defer the call slightly. This is a common pattern to ensure that the BuildContext is fully initialized and available before attempting to access the Provider.
+  //   _fetchIssuesFuture = Future.microtask(() =>
+  //       Provider.of<AppProvider>(context, listen: false).fetchIssues());
+
+  //   startPolling();
+  // }
+
+  // // it performs an initial fetchIssues(userSpecific: true) to populate _issueStatusCache with the current user's issues and their statuses. This ensures you have a baseline to compare against.
+  // // Then, it sets up Timer.periodic(const Duration(seconds: 30), (_) => checkForStatusChanges()) to run checkForStatusChanges every 30 seconds.
+  // void startPolling() {
+  //   // Initial fetch to populate the cache
+  //   Provider.of<AppProvider>(context, listen: false).fetchIssues(userSpecific: true).then((_) {
+  //     final issues = Provider.of<AppProvider>(context, listen: false).issues;
+  //     for (var issue in issues) {
+  //       _issueStatusCache[issue.id] = issue.status;
+  //     }
+  //     print('Initial issue status cache populated.');
+  //   }).catchError((e) {
+  //     print('Error populating initial issue status cache: $e');
+  //   });
+
+  //   // Timer object that will repeatedly call checkForStatusChanges().
+  //   _pollingTimer = Timer.periodic(const Duration(seconds: 30), (_) => checkForStatusChanges());
+  // }
+
+  // Future<void> checkForStatusChanges() async {
+  //   print('Polling check at ${DateTime.now()}');
+  //   try {
+  //     final issueProvider = Provider.of<AppProvider>(context, listen: false);
+
+  //     await issueProvider.fetchIssues(userSpecific: true); // fetch only current user's issues
+  //     //current user issues
+  //     final issues = issueProvider.issues; 
+
+  //     for (var issue in issues) {
+  //       // previous status from cache
+  //       final previousStatus = _issueStatusCache[issue.id];
+
+  //       if (previousStatus != null && previousStatus != issue.status) {
+  //         print('Status changed for ${issue.id} from $previousStatus to ${issue.status}');
+  //         // Trigger notification using the global instance
+  //         await notificationService.showIssueStatusNotification( // trigger local notification
+  //           issueId: issue.id,
+  //           issueTitle: issue.title,
+  //           newStatus: issue.status,
+  //         );
+  //         print('Notification triggered');
+  //       }
+
+  //       _issueStatusCache[issue.id] = issue.status; // update cache
+  //     }
+  //   } catch (e) {
+  //     print('Polling error: $e');
+  //   }
+  // }
+  
+  // @override
+  // void dispose() {
+  //   // stop the timer when the screen is removed from the widget tree, preventing memory leaks.
+  //   _pollingTimer?.cancel();
+  //   super.dispose();
+  // }
+  // //
+
+  // // Method to re-fetch issues based on filters
+  // // reenter the fetching state briefly while the new data is fetched.
+  // void _refreshIssues() {
+  //   setState(() {
+  //     _fetchIssuesFuture = Provider.of<AppProvider>(context, listen: false)
+  //         .fetchIssues(
+  //           status: _selectedStatusFilter, // Pass selected status
+  //           userSpecific: _showMyIssues, // Pass "My Issues" toggle state
+  //         );
+  //   });
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -267,16 +408,6 @@ class _ViewIssuesScreenState extends State<ViewIssuesScreen> {
               ),
             ],
           ),
-          // floatingActionButton: appProvider.issues.isNotEmpty ? FloatingActionButton.extended(
-          //   onPressed: () {
-          //     Navigator.of(context).push(MaterialPageRoute(
-          //       builder: (context) => IssueMapScreen(issues: appProvider.issues),
-          //     ));
-          //   },
-          //   label: const Text('View on Map'),
-          //   icon: const Icon(Icons.map),
-          //   backgroundColor: Colors.blue,
-          // ) : null,
         );
       },
     );

@@ -108,6 +108,10 @@ class IssueDetailScreen extends StatelessWidget {
               'Reported On: ${issue.reportedAt.toLocal().toString().split('.')[0]}',
               style: const TextStyle(fontSize: 14, color: Colors.grey),
             ),
+            Text(
+              'Reported By: ${issue.reportedBy ?? 'Unknown'}', // Display reportedBy or 'Unknown' if null
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
+            ),
           ],
         ),
       ),

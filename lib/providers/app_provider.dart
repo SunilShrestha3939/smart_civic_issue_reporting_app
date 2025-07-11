@@ -7,8 +7,11 @@ import 'dart:convert'; // For JSON decoding
 import 'package:smart_civic_app/utils/constants.dart'; // Import AppConstants
 import 'package:smart_civic_app/models/user.dart'; // Import User model
 import 'package:smart_civic_app/models/issue.dart'; // Import Issue model
+import 'package:smart_civic_app/services/notification_service.dart';
 
 class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provides the notifyListeners method
+
+  final NotificationService _notificationService;
 
   // Private variables to holding state
   int _counter = 0;
@@ -43,7 +46,7 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
   bool get isIssuesLoading => _isIssuesLoading; // Getter for loading state
   String? get issuesErrorMessage => _issuesErrorMessage; // Getter for error message
 
-  AppProvider() {
+  AppProvider(this._notificationService) {
     _loadAuthToken(); //checks if a token exists from a previous session.
   }
 
@@ -119,12 +122,15 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
         final Map<String, dynamic> userJson = responseList[0];  // Use the first user
         _currentUser = User.fromJson(userJson);
         _isAdmin = _currentUser!.isStaff;
+
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user_data', json.encode(_currentUser!.toJson()));
+        await prefs.setInt('user_id', _currentUser!.id);
+        // await prefs.setBool('is_admin', _isAdmin);
       } // Set admin status based on is_staff flag
 
         print(_isAdmin ? '###User is an admin' : '###User is not an admin');
 
-        // SharedPreferences prefs = await SharedPreferences.getInstance();
-        // await prefs.setString('user_data', json.encode(_currentUser!.toJson()));
 
       } else if (response.statusCode == 401) {
         // Token invalid or expired, force logout
@@ -233,6 +239,51 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
     }
   }
 
+  //fetch issue by ID
+  Future<Issue?> fetchIssueById(String issueId) async {
+  if (_authToken == null) {
+    _issuesErrorMessage = 'Not authenticated. Please log in.';
+    notifyListeners();
+    return null;
+  }
+
+  try {
+    final url = Uri.parse('${AppConstants.baseUrl}/issues/$issueId/');
+    print('Fetching issue details from: $url');
+
+    final response = await http.get(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $_authToken',
+      },
+    );
+
+    print('Response status (Fetch issue by ID): ${response.statusCode}');
+
+    if (response.statusCode == 200) {
+      print('Issue fetched successfully: ${response.body}');
+      final Map<String, dynamic> issueJson = json.decode(response.body);
+      final issue = Issue.fromJson(issueJson);
+      return issue;
+    } else if (response.statusCode == 401) {
+      _issuesErrorMessage = 'Unauthorized. Please log in again.';
+      await clearAuthToken(forceLogout: true);
+      notifyListeners();
+      return null;
+    } else {
+      final errorData = json.decode(response.body);
+      _issuesErrorMessage = 'Failed to load issue: ${errorData['detail'] ?? response.statusCode}';
+      notifyListeners();
+      return null;
+    }
+  } catch (e) {
+    _issuesErrorMessage = 'Network error: $e';
+    notifyListeners();
+    return null;
+  }
+}
+
   // Day 12: New method to update issue status for admin dashboard
   Future<bool> updateIssueStatus(String issueId, String newStatus) async {
     if (_authToken == null || !_isAdmin) { // Only allow admin to update
@@ -260,11 +311,18 @@ class AppProvider with ChangeNotifier { // ChangeNotifier is a mixin that provid
         // indexWhere returns the index of the first match or -1 if not found.
         int index = _issues.indexWhere((issue) => issue.id == issueId);
         if (index != -1) {  
-          // Create a new Issue object with the updated status
-          // response.body contains the updated issue as JSON.
-          // json.decode(response.body) parses it into a Map<String, dynamic>.
-          // Issue.fromJson(...) creates a fresh Issue object from the response.
-          _issues[index] = Issue.fromJson(json.decode(response.body));
+          final updatedIssue = Issue.fromJson(json.decode(response.body));
+          _issues[index] = updatedIssue;
+
+          // Trigger notification for the user whose issue status changed
+          // We need the original issue title for the notification
+          final originalIssueTitle = _issues[index].title; // Get the title from the updated issue
+
+          await _notificationService.showIssueStatusNotification(
+            issueId: issueId,
+            issueTitle: originalIssueTitle,
+            newStatus: newStatus,
+          );
         }
         notifyListeners(); // Notify UI that a specific issue might have changed
         return true;
