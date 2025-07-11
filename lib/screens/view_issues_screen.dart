@@ -74,6 +74,15 @@ class _ViewIssuesScreenState extends State<ViewIssuesScreen> {
   }
 
   Future<void> checkForStatusChanges() async {
+    // 1. **Crucial check:** Only proceed if the widget is still mounted.
+    // If 'mounted' is false, it means the widget has been unmounted,
+    // and its 'context' is no longer valid.
+    if (!mounted) {
+      print('Polling skipped: Widget is unmounted.');
+      return; // Stop execution if the widget is not mounted.
+    }
+
+
     print('Polling check at ${DateTime.now()}');
     try {
       final issueProvider = Provider.of<AppProvider>(context, listen: false);
@@ -111,7 +120,8 @@ class _ViewIssuesScreenState extends State<ViewIssuesScreen> {
 
   @override
   void dispose() {
-    _pollingTimer?.cancel();
+    _pollingTimer?.cancel();  // timer cancelled to prevent memory leaks
+    print('Polling timer cancelled.');
     super.dispose();
   }
 

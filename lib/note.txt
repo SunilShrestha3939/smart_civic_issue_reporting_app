@@ -79,3 +79,11 @@ multipart/form-data for Files: Standard HTML forms use this encoding when upload
 Authorization Header: For any API endpoint that requires a logged-in user, you must send the authentication token (received during login/registration) in the Authorization header. The format (e.g., Token YOUR_TOKEN or Bearer YOUR_TOKEN) depends on your Django REST Framework authentication setup. Your Django backend then validates this token to ensure the request is coming from an authenticated user.
 
 Separation of Concerns: By handling the API calls within the screen's _submitIssue method, we keep the UI logic and network logic somewhat separate. In larger apps, you might move this network logic into a dedicated "service" or "repository" class for even better organization.
+
+
+
+mounted Getter: Every State object in Flutter has a mounted getter. It returns true if the State object is currently in the widget tree and false otherwise. When dispose is called, mounted becomes false.
+
+Preventing context access: By adding if (!mounted) { return; } at the very beginning of checkForStatusChanges, you ensure that none of the code that relies on context (like Provider.of<AppProvider>(context, listen: false)) will execute if the widget is no longer active.
+
+dispose() is key: The _pollingTimer?.cancel(); line in dispose() is still critically important. While mounted prevents errors from an unmounted widget, canceling the timer is good practice to free up resources and prevent unnecessary background operations once the screen is no longer in use. If you don't cancel the timer, it will keep running indefinitely in the background, consuming resources, even if it's not causing "context" errors.
